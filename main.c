@@ -1,3 +1,5 @@
+/* This file uses some code from the nxdk samples for SDL and winapi */
+
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
