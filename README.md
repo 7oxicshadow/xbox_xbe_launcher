@@ -1,5 +1,5 @@
 # xbox_xbe_launcher
-When placed on the root of an xiso it will list all detected XBE files and provide an option to select which one you wish to launch. This is useful for chihiro games that do not have a default.xbe or for allowing multiple modded xbe files to exist on the idso (60fps, widescreen patched etc...)
+When placed on the root of an xiso it will list all detected XBE files and provide an option to select which one you wish to launch. This is useful for chihiro games that do not have a default.xbe or for allowing multiple modded xbe files to exist on the iso (60fps, widescreen patched etc...)
 
 ## Prerequisites
 NXDK will need some additional libraries to be installed. Use the following guide:  
