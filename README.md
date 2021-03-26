@@ -14,7 +14,8 @@ NXDK will need some additional libraries to be installed. Use the following guid
 
 ## Usage
 1. Extract the xiso using extract-xiso (32bit version recommended as 64bit can create corrupt files)
-2. Rename the default.xbe located in the root of the extracted iso to anything you like (I use _default.xbe)
+2. Rename the default.xbe located in the root of the extracted iso to "_default.xbe". (The auto start timer uses this.)  
+   Note: If your game does not have a default.xbe (chihiro) then skip step 2
 3. Copy the built default.xbe from the bin folder of this project to the extracted iso folder
 4. Rebuild the xiso using extract-xiso with the '-c' option
 5. Play
