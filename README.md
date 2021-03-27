@@ -1,4 +1,7 @@
 # xbox_xbe_launcher
+
+![Screenshot](/doc/images/xbe_launcher.png)
+
 When placed on the root of an xiso it will list all detected XBE files and provide an option to select which one you wish to launch. This is useful for chihiro games that do not have a default.xbe or for allowing multiple modded xbe files to exist on the iso (60fps, widescreen patched etc...)
 
 ## Prerequisites
