@@ -11,6 +11,7 @@
 #include <pbkit/pbkit.h>
 #include <stdbool.h>
 #include <time.h>
+#include "main.h"
 
 char namearray[10][100];
 char path[255];
@@ -18,6 +19,75 @@ bool pbk_init = false;
 bool sdl_init = false;
 SDL_GameController *pad = NULL;
 int target_xbe = 0;
+cert_data_un xbecert;
+char ascii_title[41];
+char ascii_region[30];
+
+void read_header(void)
+{
+    FILE *fptr = NULL;
+    int i;
+    char temp_path[100];
+    header_data_un xbeheader;
+
+    //create path string
+    memset(temp_path,'\0', sizeof(temp_path));
+    strcat(temp_path, "d:\\");
+    strcat(temp_path, &namearray[0][0]);
+                        
+    //attempt to open path
+    fptr = fopen(temp_path, "r");
+    
+    //check for failure to open
+    if(fptr == NULL){
+        debugPrint("Header : failed to open xbe\n");
+        Sleep(2000);
+        return;
+    }
+    
+    //populate local copy of the header (Not a complete header)
+    i = 0;
+    while(i < sizeof(xbeheader.headerraw))
+    {
+        xbeheader.headerraw[i] = fgetc(fptr);
+        //debugPrint("%02X", xbeheader.headerraw[i]);
+        i++;
+    }
+    
+    //move file pointer to the start of the certificate.
+    fseek(fptr, xbeheader.headerdata.dwCertificateAddr - xbeheader.headerdata.dwBaseAddr, SEEK_SET);
+    
+    //populate local copy of the certificate
+    i = 0;
+    while(i < sizeof(xbecert.certraw))
+    {
+        xbecert.certraw[i] = fgetc(fptr);
+        //debugPrint("%02X", xbecert.certraw[i]);
+        i++;
+    }
+    
+    //convert title to ascii (16bit padded to char)
+    i = 0;
+    while(i < 40)
+    {
+        ascii_title[i] = (char)xbecert.certdata.wszTitleName[i];
+        //debugPrint("%c", ascii_title[i]);
+        i++;
+    }
+    
+    //convert region to ascii string
+    if((xbecert.certdata.dwGameRegion & GAME_REGION_NA) != 0)
+        strcat(ascii_region, "NA, ");
+    if((xbecert.certdata.dwGameRegion & GAME_REGION_JAPAN) != 0)
+        strcat(ascii_region, "JAPAN, ");
+    if((xbecert.certdata.dwGameRegion & GAME_REGION_RESTOFWORLD) != 0)
+        strcat(ascii_region, "ROW, ");
+    if((xbecert.certdata.dwGameRegion & GAME_REGION_MANUFACTURING) != 0)
+        strcat(ascii_region, "MANU");
+    
+    //close the xbe
+    fclose(fptr);
+}
 
 void wait_then_cleanup(void)
 {
@@ -72,9 +142,15 @@ void findfiles(void)
 void init(void)
 {
     BOOL ret;
+    
+    memset(xbecert.certraw, 0, sizeof(xbecert.certraw));
+    memset(namearray,'\0', sizeof(namearray));
+    memset(path,'\0', sizeof(path));
+    memset(ascii_title,'\0', sizeof(ascii_title));
+    memset(ascii_region,'\0', sizeof(ascii_region));
 
     XVideoSetMode(640, 480, 32, REFRESH_DEFAULT);
-
+        
     sdl_init = SDL_Init(SDL_INIT_GAMECONTROLLER) == 0;
     if (!sdl_init) {
         debugPrint("SDL_Init failed: %s\n", SDL_GetError());
@@ -97,9 +173,6 @@ void init(void)
         debugPrint("pbkit init failed\n");
         wait_then_cleanup();
     }
-
-    memset(namearray,'\0', sizeof(namearray));
-    memset(path,'\0', sizeof(path));
 
     // Mount D:
     if (nxIsDriveMounted('D')) {
@@ -130,15 +203,17 @@ int main(void)
     BOOL reset_target_complete = false;
     clock_t start_clock;
     clock_t diff_clock;
-
+       
     init();
 
     findfiles();
+    
+    read_header();
 
     pb_show_front_screen();
    
     start_clock = clock();
-
+    
     while (1) {
 
         //process the timer
@@ -170,7 +245,10 @@ int main(void)
         
         pb_print("XBE Launcher\n");
         pb_print("------------\n\n");
-
+        
+        pb_print("Title: %s\n", ascii_title);
+        pb_print("Region Flags: %s\n\n", ascii_region);
+        
         //print available xbe files
         int y = 0;
         numchoices = 0;
