@@ -89,16 +89,19 @@ void read_header(void)
     fclose(fptr);
 }
 
-void wait_then_cleanup(void)
+void cleanup(void)
 {
-    Sleep(5000);
-
     if (pbk_init)
         pb_kill();
     if (pad != NULL)
         SDL_GameControllerClose(pad);
     if (sdl_init)
         SDL_Quit();
+}
+
+void cleanup_and_exit(void)
+{
+    cleanup();
     exit(1);
 }
 
@@ -142,6 +145,7 @@ void findfiles(void)
 void init(void)
 {
     BOOL ret;
+    SDL_Event event;
     
     memset(xbecert.certraw, 0, sizeof(xbecert.certraw));
     memset(namearray,'\0', sizeof(namearray));
@@ -150,28 +154,34 @@ void init(void)
     memset(ascii_region,'\0', sizeof(ascii_region));
 
     XVideoSetMode(640, 480, 32, REFRESH_DEFAULT);
-        
+       
     sdl_init = SDL_Init(SDL_INIT_GAMECONTROLLER) == 0;
     if (!sdl_init) {
         debugPrint("SDL_Init failed: %s\n", SDL_GetError());
-        wait_then_cleanup();
+        cleanup_and_exit();
     }
-
+    
     if (SDL_NumJoysticks() < 1) {
         debugPrint("Please connect gamepad\n");
-        wait_then_cleanup();
+        while (SDL_NumJoysticks() < 1)
+        {
+            SDL_PollEvent(&event);
+            Sleep(100);
+        }
+        //force a restart
+        cleanup_and_exit();
     }
-
+    
     pad = SDL_GameControllerOpen(0);
     if (pad == NULL) {
         debugPrint("Failed to open gamecontroller 0\n");
-        wait_then_cleanup();
+        cleanup_and_exit();
     }
 
     pbk_init = pb_init() == 0;
     if (!pbk_init) {
         debugPrint("pbkit init failed\n");
-        wait_then_cleanup();
+        cleanup_and_exit();
     }
 
     // Mount D:
@@ -214,7 +224,7 @@ int main(void)
    
     start_clock = clock();
     
-    while (1) {
+    while (!startlaunch) {
 
         //process the timer
         if(countdown_enabled){
@@ -322,12 +332,11 @@ int main(void)
         pb_draw_text_screen();
         while (pb_busy());
         while (pb_finished());
-
-        if(startlaunch){
-            Sleep(1000);
-            XLaunchXBE(path);
-        }
     }
 
-    wait_then_cleanup();
+    cleanup();
+    
+    XLaunchXBE(path);
+    
+    exit(1);
 }
