@@ -38,16 +38,24 @@ void read_header(void)
 
     //create path string
     memset(temp_path,'\0', sizeof(temp_path));
-    strcat(temp_path, "d:\\_default.xbe");
+    strcat(temp_path, "d:\\");
+    strcat(temp_path, &namearray[0][0]);
                         
-    //attempt to open path
-    fptr = fopen(temp_path, "r");
-    
-    //check for failure to open
+    //attempt to open default path first
+    fptr = fopen("d:\\_default.xbe", "r");
+
+    //check if the file failed to open
     if(fptr == NULL){
-        debugPrint("Header : failed to open xbe\n");
-        Sleep(2000);
-        return;
+
+        //try again with the path of the first xbe we found
+        fptr = fopen(temp_path, "r");
+    
+        //check for failure to open
+        if(fptr == NULL){
+            debugPrint("Header : failed to open xbe\n");
+            Sleep(2000);
+            return;
+        }
     }
 
     //populate local copy of the header (Not a complete header)
