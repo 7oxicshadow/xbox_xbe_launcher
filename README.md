@@ -11,9 +11,7 @@ NXDK will need some additional libraries to be installed. Use the following guid
 ## Build
 1. Clone the repo
 2. cd into the xbox_xbe_launcher folder
-3. Update the submodules:  
-        git submodule update --init --recursive
-4. run make
+3. Run build.sh
 
 ## Usage
 1. Extract the xiso using extract-xiso (32bit version recommended as 64bit can create corrupt files)

@@ -13,7 +13,12 @@
 #include <time.h>
 #include "main.h"
 
-char namearray[10][100];
+#define MAX_XBE_COUNT   ( 10 )
+#define MAX_XBE_LENGTH  ( 20 )
+
+char namearray[MAX_XBE_COUNT][MAX_XBE_LENGTH];
+char listbuffer[100];
+char selectbuffer[50];
 char path[255];
 bool pbk_init = false;
 bool sdl_init = false;
@@ -24,16 +29,16 @@ char ascii_title[41];
 char ascii_region[30];
 
 void read_header(void)
-{
+{    
     FILE *fptr = NULL;
     int i;
-    char temp_path[100];
+    char temp_path[30];
     header_data_un xbeheader;
+
 
     //create path string
     memset(temp_path,'\0', sizeof(temp_path));
-    strcat(temp_path, "d:\\");
-    strcat(temp_path, &namearray[0][0]);
+    strcat(temp_path, "d:\\_default.xbe");
                         
     //attempt to open path
     fptr = fopen(temp_path, "r");
@@ -44,16 +49,16 @@ void read_header(void)
         Sleep(2000);
         return;
     }
-    
+
     //populate local copy of the header (Not a complete header)
     i = 0;
-    while(i < sizeof(xbeheader.headerraw))
+    while(i < (sizeof(xbeheader.headerraw)) )
     {
         xbeheader.headerraw[i] = fgetc(fptr);
         //debugPrint("%02X", xbeheader.headerraw[i]);
         i++;
     }
-    
+
     //move file pointer to the start of the certificate.
     fseek(fptr, xbeheader.headerdata.dwCertificateAddr - xbeheader.headerdata.dwBaseAddr, SEEK_SET);
     
@@ -65,7 +70,7 @@ void read_header(void)
         //debugPrint("%02X", xbecert.certraw[i]);
         i++;
     }
-    
+
     //convert title to ascii (16bit padded to char)
     i = 0;
     while(i < 40)
@@ -124,13 +129,20 @@ void findfiles(void)
         if (! (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
             //do not include the launcher default.xbe
             if(strcmp(findFileData.cFileName, "default.xbe") != 0){
-                strcpy(&namearray[i][0], findFileData.cFileName);
+                
+                snprintf(&namearray[i][0], (MAX_XBE_LENGTH - 1), "%s", findFileData.cFileName);
+
                 //set "_default.xbe" as the default if found
                 if(strcmp(findFileData.cFileName, "_default.xbe") == 0)
                     target_xbe = i;
                 i++;
             }
         }
+
+        /* Drop out if we exceed the max storage count */
+        if( i > MAX_XBE_COUNT )
+            break;
+
     } while (FindNextFile(hFind, &findFileData) != 0);
 
     DWORD error = GetLastError();
@@ -160,23 +172,6 @@ void init(void)
         debugPrint("SDL_Init failed: %s\n", SDL_GetError());
         cleanup_and_exit();
     }
-    
-    if (SDL_NumJoysticks() < 1) {
-        debugPrint("Please connect gamepad\n");
-        while (SDL_NumJoysticks() < 1)
-        {
-            SDL_PollEvent(&event);
-            Sleep(100);
-        }
-        //force a restart
-        cleanup_and_exit();
-    }
-    
-    pad = SDL_GameControllerOpen(0);
-    if (pad == NULL) {
-        debugPrint("Failed to open gamecontroller 0\n");
-        cleanup_and_exit();
-    }
 
     pbk_init = pb_init() == 0;
     if (!pbk_init) {
@@ -202,17 +197,17 @@ int main(void)
     #define DEBOUNCE (5)
     #define COUNTDOWN (5)
     
-    int db_up = 0;
-    int db_dn = 0;
-    int db_a = 0;
+    static SDL_Event e;
     int numchoices = 0;
     int timer = COUNTDOWN;
+    int j, y;
     BOOL prelaunch = false;
     BOOL startlaunch = false;
     BOOL countdown_enabled = true;
     BOOL reset_target_complete = false;
     clock_t start_clock;
     clock_t diff_clock;
+    int button_release = TRUE;
        
     init();
 
@@ -223,8 +218,30 @@ int main(void)
     pb_show_front_screen();
    
     start_clock = clock();
+
+    //Create a string of discovered files
+    y = 0;
+    j = 0;
+    numchoices = 0;
+    for(y=0; y<10; y++){
+        if(namearray[y][0] != '\0'){
+            j += sprintf(listbuffer + j, "%d : %s\n", y, &namearray[y][0]);
+            numchoices++;
+        }
+    }
+
+    //offset by one because we reference the array from 0
+    if(numchoices > 0 )
+        numchoices--;
     
     while (!startlaunch) {
+
+        /* Clear the screen */
+        pb_wait_for_vbl();
+        pb_target_back_buffer();
+        pb_reset();
+        pb_fill(0, 0, 640, 480, 0);
+        pb_erase_text_screen();
 
         //process the timer
         if(countdown_enabled){
@@ -235,6 +252,9 @@ int main(void)
                 start_clock = clock();
                 timer--;
             }
+
+            /* Set the feedback line for the user */
+            sprintf(selectbuffer, "Auto launch (%s) in %d seconds\n", &namearray[target_xbe][0], timer);
         }
         else{
             //reset the target_xbe to 0 once if timer has been disabled
@@ -243,80 +263,93 @@ int main(void)
                 reset_target_complete = true;
             
             }
+
+            /* Set the feedback line for the user */
+            sprintf(selectbuffer, "Select Required XBE Number : %d\n", target_xbe);
         }
 
-        pb_wait_for_vbl();
-        pb_target_back_buffer();
-        pb_reset();
-        pb_fill(0, 0, 640, 480, 0);
-        pb_erase_text_screen();
+        /* Print the main screen */
+        pb_print("XBE Launcher\n"
+                 "------------\n"
+                 "Title: %s\n"
+                 "Region Flags: %s\n\n"
+                 "%s\n"
+                 "(Use dpad up/down and A to manually select)\n"
+                 "%s\n",
+                 ascii_title,
+                 ascii_region,
+                 listbuffer,
+                 selectbuffer);
 
+        /* Poll the SDL queue to determine the connected controller */
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_CONTROLLERDEVICEADDED) {
+                SDL_GameController *new_pad = SDL_GameControllerOpen(e.cdevice.which);
+                if (pad == NULL) {
+                pad = new_pad;
+                }
+            }
+            else if (e.type == SDL_CONTROLLERDEVICEREMOVED) {
+                if (pad == SDL_GameControllerFromInstanceID(e.cdevice.which)) {
+                pad = NULL;
+                }
+                SDL_GameControllerClose(SDL_GameControllerFromInstanceID(e.cdevice.which));
+            }
+            else if (e.type == SDL_CONTROLLERBUTTONDOWN) {
+                if (e.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+                pad = (SDL_GameControllerFromInstanceID(e.cdevice.which));
+                }
+            }
+        }
+
+        /* Manually update the controller buttons. (Is this needed?) */
         SDL_GameControllerUpdate();
-        
-        pb_print("XBE Launcher\n");
-        pb_print("------------\n\n");
-        
-        pb_print("Title: %s\n", ascii_title);
-        pb_print("Region Flags: %s\n\n", ascii_region);
-        
-        //print available xbe files
-        int y = 0;
-        numchoices = 0;
-        for(y=0; y<10; y++){
-            if(namearray[y][0] != '\0'){
-                pb_print("%d : %s\n", y, &namearray[y][0]);
-                numchoices++;
-            }
-        }
 
-        //offset by one because we reference the array from 0
-        if(numchoices > 0 )
-            numchoices--;
+        /* Check if we have detected a pad */
+        if (pad != NULL) {
 
-        if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_UP)){
-            db_up++;
-            if(db_up > DEBOUNCE){
-                if(target_xbe < numchoices){
-                    target_xbe++;
+            /* Check for dpad up press */
+            if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_UP)){
+
+                if (TRUE == button_release )
+                {
+                    if(target_xbe < numchoices){
+                        target_xbe++;
+                    }
+                    countdown_enabled = false;
                 }
-                db_up = 0;
-                countdown_enabled = false;
-            }
-        }
-        else
-            db_up = 0;
 
-        if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_DOWN)){
-            db_dn++;
-            if(db_dn > DEBOUNCE){
-                if(target_xbe > 0){
-                    target_xbe--;
+                button_release = FALSE;
+
+            }
+            /* Check for dpad down press */
+            else if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_DOWN)){
+
+                if (TRUE == button_release )
+                {
+                    if(target_xbe > 0){
+                        target_xbe--;
+                    }
+                    countdown_enabled = false;
                 }
-                db_dn = 0;
-                countdown_enabled = false;
-            }
-        }
-        else
-            db_dn = 0;
 
-        pb_print("\n");
-        pb_print("(Use dpad up/down and A to manually select)\n");
-        pb_print("\n");
-        if(countdown_enabled)
-            pb_print("Auto launch (%s) in %d seconds\n", &namearray[target_xbe][0], timer);     
-        else
-            pb_print("Select Required XBE Number : %d\n", target_xbe);
-
-        if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A)){
-            db_a++;
-            if(db_a > DEBOUNCE){
-                prelaunch = true;
-                db_a = 0;
-                countdown_enabled = false;
+                button_release = FALSE;
             }
-        }
-        else{
-            db_a = 0;
+            /* Check for button a press */
+            else if(SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A)){
+
+                if (TRUE == button_release )
+                {
+                    prelaunch = true;
+                    countdown_enabled = false;
+                }
+
+                button_release = FALSE;
+            }
+            /* No Press */
+            else{
+                button_release = TRUE;
+            }
         }
         
         // we do a pre-launch here so that the screen is updated before launch
@@ -329,13 +362,16 @@ int main(void)
             startlaunch = true;
         }
 
+        /* Output buffer to screen */
         pb_draw_text_screen();
         while (pb_busy());
         while (pb_finished());
     }
 
+    /* Shutdown un-needed systems */
     cleanup();
     
+    /* Launch the selected xbe */
     XLaunchXBE(path);
     
     exit(1);
