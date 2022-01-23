@@ -14,7 +14,7 @@
 #include "main.h"
 
 #define MAX_XBE_COUNT   ( 10 )
-#define MAX_XBE_LENGTH  ( 20 )
+#define MAX_XBE_LENGTH  ( 35 )
 
 char namearray[MAX_XBE_COUNT][MAX_XBE_LENGTH];
 char listbuffer[100];
