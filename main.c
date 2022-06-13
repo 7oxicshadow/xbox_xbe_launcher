@@ -1,6 +1,7 @@
 /* This file uses some code from the nxdk samples for SDL and winapi */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <nxdk/mount.h>
@@ -162,6 +163,45 @@ void findfiles(void)
     FindClose(hFind);
 }
 
+int parse_choicefile(void)
+{
+    int retval = false;
+    FILE *fptr = NULL;
+    char buffer[128];
+    int len = 0;
+    int read = 0;
+    int i = 0;
+    int num = 0;
+
+    //attempt to open choice txt file
+    fptr = fopen("d:\\choice.txt", "r");
+
+    if( NULL != fptr )
+    {
+        while ((fgets(buffer, 128, fptr)) != NULL) 
+        {
+            if(buffer[0] == '&')
+            {
+                num = snprintf(&namearray[i][0], (MAX_XBE_LENGTH - 1), "%s", &buffer[1]);
+                namearray[i][num-1] = '\0'; //remove '\n'
+                i++;
+            }
+            else if(buffer[0] == '!')
+            {
+                target_xbe = atoi(&buffer[1]);
+            }
+            else
+            {
+                /* Do nothing */
+            }
+        }
+        
+        fclose(fptr);
+    }
+
+    return(retval);
+}
+
 void init(void)
 {
     BOOL ret;
@@ -211,15 +251,20 @@ int main(void)
     int j, y;
     BOOL prelaunch = false;
     BOOL startlaunch = false;
-    BOOL countdown_enabled = true;
-    BOOL reset_target_complete = false;
     clock_t start_clock;
     clock_t diff_clock;
     int button_release = TRUE;
+    BOOL countdown_enabled = true;
+    BOOL reset_target_complete = false;
        
     init();
 
-    findfiles();
+    //check to see is a choice file exists and parse if it does
+    if( false == parse_choicefile() )
+    { 
+        //no choice file found. Scan the drive and auto create a list
+        findfiles();
+    }
     
     read_header();
 
