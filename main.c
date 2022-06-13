@@ -28,6 +28,7 @@ int target_xbe = 0;
 cert_data_un xbecert;
 char ascii_title[41];
 char ascii_region[30];
+bool choicefilefound = false;
 
 void read_header(void)
 {    
@@ -178,6 +179,8 @@ int parse_choicefile(void)
 
     if( NULL != fptr )
     {
+        choicefilefound = true;
+
         while ((fgets(buffer, 128, fptr)) != NULL) 
         {
             if(buffer[0] == '&')
@@ -197,6 +200,8 @@ int parse_choicefile(void)
         }
         
         fclose(fptr);
+
+        retval = true;
     }
 
     return(retval);
@@ -321,18 +326,36 @@ int main(void)
             sprintf(selectbuffer, "Select Required XBE Number : %d\n", target_xbe);
         }
 
-        /* Print the main screen */
-        pb_print("XBE Launcher\n"
-                 "------------\n"
-                 "Title: %s\n"
-                 "Region Flags: %s\n\n"
-                 "%s\n"
-                 "(Use dpad up/down and A to manually select)\n"
-                 "%s\n",
-                 ascii_title,
-                 ascii_region,
-                 listbuffer,
-                 selectbuffer);
+        if(( true == choicefilefound ) && ( true == countdown_enabled ))
+        {
+            /* Print the main screen */
+            pb_print("XBE Launcher\n"
+                    "------------\n"
+                    "Title: %s\n"
+                    "Region Flags: %s\n\n"
+                    "%s\n"
+                    "(Use dpad up/down and A to manually select)\n"
+                    "%s\n",
+                    ascii_title,
+                    ascii_region,
+                    "Choice File Found! Auto Loading Specified File.\n",
+                    selectbuffer);
+        }
+        else
+        {
+            /* Print the main screen */
+            pb_print("XBE Launcher\n"
+                    "------------\n"
+                    "Title: %s\n"
+                    "Region Flags: %s\n\n"
+                    "%s\n"
+                    "(Use dpad up/down and A to manually select)\n"
+                    "%s\n",
+                    ascii_title,
+                    ascii_region,
+                    listbuffer,
+                    selectbuffer);
+        }
 
         /* Poll the SDL queue to determine the connected controller */
         while (SDL_PollEvent(&e)) {
